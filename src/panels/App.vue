@@ -202,15 +202,16 @@ const handleEnter = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #2b2b2b;
+  color: #cccccc;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  padding: 8px;
-  background-color: white;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 6px 8px;
+  background-color: #3c3c3c;
+  border-bottom: 1px solid #525252;
   gap: 8px;
 }
 
@@ -219,24 +220,83 @@ const handleEnter = () => {
   gap: 4px;
 }
 
+.nav-buttons .el-button {
+  background-color: #4a4a4a;
+  border-color: #606060;
+  color: #cccccc;
+}
+
+.nav-buttons .el-button:hover {
+  background-color: #5a5a5a;
+  border-color: #707070;
+}
+
+.nav-buttons .el-button:disabled {
+  background-color: #3a3a3a;
+  border-color: #4a4a4a;
+  color: #666666;
+}
+
 .address-bar {
   flex: 1;
   max-width: 600px;
+}
+
+.address-bar :deep(.el-input) {
+  --el-input-bg-color: #4a4a4a;
+  --el-input-border-color: #606060;
+  --el-input-hover-border-color: #707070;
+  --el-input-focus-border-color: #409eff;
+  --el-input-text-color: #cccccc;
+  --el-input-placeholder-color: #999999;
+}
+
+.address-bar :deep(.el-input__wrapper) {
+  background-color: #4a4a4a;
+  border-color: #606060;
+}
+
+.address-bar :deep(.el-input__wrapper:hover) {
+  border-color: #707070;
+}
+
+.address-bar :deep(.el-input__inner) {
+  color: #cccccc;
+}
+
+.address-bar :deep(.el-input__inner::placeholder) {
+  color: #999999;
+}
+
+.address-bar :deep(.el-input-group__append) {
+  background-color: #4a4a4a;
+  border-color: #606060;
+}
+
+.address-bar :deep(.el-input-group__append .el-button) {
+  background-color: #4a4a4a;
+  border-color: #606060;
+  color: #cccccc;
+}
+
+.address-bar :deep(.el-input-group__append .el-button:hover) {
+  background-color: #5a5a5a;
+  border-color: #707070;
 }
 
 .quick-sites {
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  background-color: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
+  background-color: #353535;
+  border-bottom: 1px solid #525252;
   gap: 8px;
   overflow-x: auto;
 }
 
 .quick-label {
   font-size: 12px;
-  color: #666;
+  color: #999999;
   white-space: nowrap;
 }
 
@@ -244,12 +304,18 @@ const handleEnter = () => {
   font-size: 12px;
   padding: 2px 8px !important;
   white-space: nowrap;
+  color: #409eff !important;
+}
+
+.quick-site-btn:hover {
+  color: #66b3ff !important;
+  background-color: #404040 !important;
 }
 
 .webview-wrapper {
   flex: 1;
   position: relative;
-  background-color: white;
+  background-color: #2b2b2b;
 }
 
 .webview {
@@ -268,11 +334,13 @@ const handleEnter = () => {
   align-items: center;
   gap: 8px;
   z-index: 10;
+  color: #cccccc;
 }
 
 .loading-icon {
   font-size: 24px;
   animation: spin 1s linear infinite;
+  color: #409eff;
 }
 
 @keyframes spin {
@@ -295,5 +363,23 @@ const handleEnter = () => {
   .quick-sites {
     padding: 2px 8px;
   }
+}
+
+/* 滚动条样式 */
+.quick-sites::-webkit-scrollbar {
+  height: 4px;
+}
+
+.quick-sites::-webkit-scrollbar-track {
+  background: #2b2b2b;
+}
+
+.quick-sites::-webkit-scrollbar-thumb {
+  background: #606060;
+  border-radius: 2px;
+}
+
+.quick-sites::-webkit-scrollbar-thumb:hover {
+  background: #707070;
 }
 </style>
