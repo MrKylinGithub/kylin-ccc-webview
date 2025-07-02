@@ -10,12 +10,13 @@ import {
 } from '@element-plus/icons-vue';
 
 // 响应式数据
-const currentUrl = ref('https://www.google.com');
-const inputUrl = ref('https://www.google.com');
+const currentUrl = ref('');
+const inputUrl = ref('');
 const webviewRef = ref<HTMLElement>();
 const loading = ref(false);
 const canGoBack = ref(false);
 const canGoForward = ref(false);
+const hasContent = ref(false);
 
 // 常用网站快捷按钮
 const quickSites = [
@@ -43,6 +44,7 @@ const loadUrl = () => {
   currentUrl.value = url;
   inputUrl.value = url;
   loading.value = true;
+  hasContent.value = true;
   
   // 更新webview src
   if (webviewRef.value) {
@@ -52,6 +54,10 @@ const loadUrl = () => {
 
 // 刷新页面
 const refresh = () => {
+  if (!currentUrl.value) {
+    ElMessage.warning('请先输入网址');
+    return;
+  }
   loading.value = true;
   if (webviewRef.value) {
     (webviewRef.value as any).reload();
@@ -177,15 +183,27 @@ const handleEnter = () => {
 
     <!-- WebView显示区域 -->
     <div class="webview-wrapper">
-      <div v-if="loading" class="loading-overlay">
+      <!-- 空状态 -->
+      <div v-if="!hasContent" class="empty-state">
+        <div class="empty-content">
+          <el-icon class="empty-icon">
+            <Search />
+          </el-icon>
+          <p class="empty-text">请输入网址开始浏览</p>
+        </div>
+      </div>
+      
+      <!-- 加载状态 -->
+      <div v-if="loading && hasContent" class="loading-overlay">
         <el-icon class="loading-icon">
           <Refresh />
         </el-icon>
         <span>加载中...</span>
       </div>
       
-      <!-- 使用iframe作为webview的替代方案 -->
+      <!-- WebView内容 -->
       <iframe
+        v-if="hasContent"
         ref="webviewRef"
         :src="currentUrl"
         class="webview"
@@ -202,8 +220,10 @@ const handleEnter = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100%;
   background-color: #2b2b2b;
   color: #cccccc;
+  overflow: hidden;
 }
 
 .toolbar {
@@ -315,13 +335,45 @@ const handleEnter = () => {
 .webview-wrapper {
   flex: 1;
   position: relative;
-  background-color: #2b2b2b;
+  background-color: #000000;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.empty-state {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000000;
+}
+
+.empty-content {
+  text-align: center;
+  color: #666666;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #404040;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #666666;
+  margin: 0;
 }
 
 .webview {
   width: 100%;
   height: 100%;
   border: none;
+  display: block;
 }
 
 .loading-overlay {
