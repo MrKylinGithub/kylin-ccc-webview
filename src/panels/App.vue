@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, computed, onMounted } from 'vue';
+import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { 
   Refresh, 
@@ -17,102 +17,8 @@ const loading = ref(false);
 const canGoBack = ref(false);
 const canGoForward = ref(false);
 const hasContent = ref(false);
-const previewUrl = ref('192.168.0.104:7456');
 
-// 获取Cocos Creator预览地址
-const getPreviewUrl = async () => {
-  try {
-    // 尝试多种方式获取预览配置
-    let port = null;
-    let ip = null;
-    
-    // 方法1: 尝试从preview配置获取
-    try {
-      port = await Editor.Profile.getProject('preview', 'port');
-      ip = await Editor.Profile.getConfig('general', 'preview-ip');
-    } catch (e) {
-      console.log('方法1获取失败:', e);
-    }
-    
-    // 方法2: 尝试从项目配置获取
-    if (!port) {
-      try {
-        const previewConfig = await Editor.Profile.getProject('preview', '');
-        if (previewConfig && previewConfig.port) {
-          port = previewConfig.port;
-        }
-      } catch (e) {
-        console.log('方法2获取失败:', e);
-      }
-    }
-    
-    // 方法3: 尝试从偏好设置获取
-    if (!port) {
-      try {
-        port = await Editor.Profile.getConfig('preferences', 'preview.port');
-        if (!ip) {
-          ip = await Editor.Profile.getConfig('preferences', 'preview.ip');
-        }
-      } catch (e) {
-        console.log('方法3获取失败:', e);
-      }
-    }
-    
-    // 方法4: 尝试获取当前编辑器版本信息（可能包含预览信息）
-    if (!port) {
-      try {
-        // 可能的配置位置
-        const configs = [
-          ['general', 'preview-port'],
-          ['general', 'previewPort'],
-          ['preview', 'serverPort'],
-          ['server', 'port']
-        ];
-        
-        for (const [section, key] of configs) {
-          try {
-            const value = await Editor.Profile.getConfig(section, key);
-            if (value) {
-              port = value;
-              break;
-            }
-          } catch (e) {
-            // 继续尝试下一个
-          }
-        }
-      } catch (e) {
-        console.log('方法4获取失败:', e);
-      }
-    }
-    
-    // 设置默认IP（如果没有获取到）
-    if (!ip) {
-      ip = '192.168.0.104';
-    }
-    
-    // 设置默认端口（如果没有获取到）
-    if (!port) {
-      port = 7456;
-    }
-    
-    previewUrl.value = `${ip}:${port}`;
-    console.log('获取到的预览地址:', previewUrl.value);
-    
-  } catch (error) {
-    console.log('获取预览端口配置失败，使用默认值:', error);
-    previewUrl.value = '192.168.0.104:7456';
-  }
-};
 
-// 常用网站快捷按钮
-const quickSites = computed(() => [
-  { name: 'Cocos预览', url: `http://${previewUrl.value}` },
-  { name: 'Google', url: 'https://www.google.com' },
-  { name: 'GitHub', url: 'https://github.com' },
-  { name: 'CocosCreator文档', url: 'https://docs.cocos.com/creator/manual/zh/' },
-  { name: 'Vue.js', url: 'https://vuejs.org' },
-  { name: 'Element Plus', url: 'https://element-plus.org/zh-CN/' }
-]);
 
 // 加载网页
 const loadUrl = () => {
@@ -171,12 +77,6 @@ const goHome = () => {
   loadUrl();
 };
 
-// 快速访问网站
-const visitQuickSite = (url: string) => {
-  inputUrl.value = url;
-  loadUrl();
-};
-
 // webview事件处理
 const onWebviewLoad = () => {
   loading.value = false;
@@ -202,10 +102,7 @@ const handleEnter = () => {
   loadUrl();
 };
 
-// 组件挂载时获取预览地址
-onMounted(() => {
-  getPreviewUrl();
-});
+
 </script>
 
 <template>
@@ -258,32 +155,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 快捷网站 -->
-    <div class="quick-sites">
-      <span class="quick-label">快速访问：</span>
-      <div class="preview-info">
-        <span class="preview-label">预览地址: {{ previewUrl }}</span>
-        <el-button
-          @click="getPreviewUrl"
-          size="small"
-          type="text"
-          class="refresh-btn"
-          :icon="Refresh"
-          title="刷新预览地址"
-        />
-      </div>
-      <el-button
-        v-for="site in quickSites"
-        :key="site.name"
-        @click="visitQuickSite(site.url)"
-        size="small"
-        type="text"
-        class="quick-site-btn"
-      >
-        {{ site.name }}
-      </el-button>
-    </div>
-
     <!-- WebView显示区域 -->
     <div class="webview-wrapper">
       <!-- 空状态 -->
@@ -322,11 +193,12 @@ onMounted(() => {
 .webview-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   width: 100%;
   background-color: #2b2b2b;
   color: #cccccc;
   overflow: hidden;
+  position: relative;
 }
 
 .toolbar {
@@ -336,17 +208,23 @@ onMounted(() => {
   background-color: #3c3c3c;
   border-bottom: 1px solid #525252;
   gap: 8px;
+  flex-shrink: 0;
+  min-height: 40px;
 }
 
 .nav-buttons {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .nav-buttons .el-button {
   background-color: #4a4a4a;
   border-color: #606060;
   color: #cccccc;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
 }
 
 .nav-buttons .el-button:hover {
@@ -362,7 +240,7 @@ onMounted(() => {
 
 .address-bar {
   flex: 1;
-  max-width: 600px;
+  min-width: 200px;
 }
 
 .address-bar :deep(.el-input) {
@@ -407,65 +285,14 @@ onMounted(() => {
   border-color: #707070;
 }
 
-.quick-sites {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  background-color: #353535;
-  border-bottom: 1px solid #525252;
-  gap: 8px;
-  overflow-x: auto;
-}
-
-.quick-label {
-  font-size: 12px;
-  color: #999999;
-  white-space: nowrap;
-}
-
-.preview-info {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-right: 8px;
-}
-
-.preview-label {
-  font-size: 12px;
-  color: #66b3ff;
-  white-space: nowrap;
-}
-
-.refresh-btn {
-  font-size: 12px;
-  padding: 2px 4px !important;
-  min-width: auto !important;
-  color: #409eff !important;
-}
-
-.refresh-btn:hover {
-  color: #66b3ff !important;
-  background-color: #404040 !important;
-}
-
-.quick-site-btn {
-  font-size: 12px;
-  padding: 2px 8px !important;
-  white-space: nowrap;
-  color: #409eff !important;
-}
-
-.quick-site-btn:hover {
-  color: #66b3ff !important;
-  background-color: #404040 !important;
-}
-
 .webview-wrapper {
   flex: 1;
   position: relative;
   background-color: #000000;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .empty-state {
@@ -502,6 +329,7 @@ onMounted(() => {
   height: 100%;
   border: none;
   display: block;
+  flex: 1;
 }
 
 .loading-overlay {
@@ -515,6 +343,9 @@ onMounted(() => {
   gap: 8px;
   z-index: 10;
   color: #cccccc;
+  background-color: rgba(43, 43, 43, 0.8);
+  padding: 16px;
+  border-radius: 4px;
 }
 
 .loading-icon {
@@ -532,6 +363,11 @@ onMounted(() => {
 @media (max-width: 600px) {
   .toolbar {
     flex-wrap: wrap;
+    padding: 4px 6px;
+  }
+  
+  .nav-buttons {
+    order: 1;
   }
   
   .address-bar {
@@ -539,27 +375,20 @@ onMounted(() => {
     width: 100%;
     margin-top: 4px;
   }
+}
+
+@media (max-width: 400px) {
+  .nav-buttons .el-button {
+    min-width: 28px;
+    height: 24px;
+    padding: 0 4px;
+  }
   
-  .quick-sites {
-    padding: 2px 8px;
+  .toolbar {
+    padding: 4px;
+    gap: 4px;
   }
 }
 
-/* 滚动条样式 */
-.quick-sites::-webkit-scrollbar {
-  height: 4px;
-}
 
-.quick-sites::-webkit-scrollbar-track {
-  background: #2b2b2b;
-}
-
-.quick-sites::-webkit-scrollbar-thumb {
-  background: #606060;
-  border-radius: 2px;
-}
-
-.quick-sites::-webkit-scrollbar-thumb:hover {
-  background: #707070;
-}
 </style>
