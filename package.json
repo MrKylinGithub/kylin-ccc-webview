@@ -28,14 +28,9 @@
     "contributions": {
         "menu": [
             {
-                "path": "i18n:menu.panel/kylin-ccc-webview",
+                "path": "i18n:menu.panel",
                 "label": "i18n:kylin-ccc-webview.title",
                 "message": "open"
-            },
-            {
-                "path": "i18n:menu.panel/kylin-ccc-webview",
-                "label": "send to panel",
-                "message": "increase"
             }
         ],
         "messages": {
@@ -64,6 +59,10 @@
                 "min-height": 300,
                 "width": 800,
                 "height": 700
+            },
+            "dock": {
+                "area": "center",
+                "alongside": "scene"
             }
         }
     }
