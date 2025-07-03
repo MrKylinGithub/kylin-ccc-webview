@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { 
   Refresh, 
@@ -8,17 +8,118 @@ import {
   HomeFilled,
   Search
 } from '@element-plus/icons-vue';
+import * as os from 'os';
+
+// 获取当前电脑的LAN地址
+const getLANAddress = () => {
+  const interfaces = os.networkInterfaces();
+  
+  for (const name of Object.keys(interfaces)) {
+    const nets = interfaces[name];
+    if (!nets) continue;
+    
+    for (const net of nets) {
+      // 跳过非IPv4和内部地址
+      if (net.family === 'IPv4' && !net.internal) {
+        // 优先返回192.168或10.0开头的地址（常见的局域网地址）
+        if (net.address.startsWith('192.168.') || net.address.startsWith('10.')) {
+          return net.address;
+        }
+      }
+    }
+  }
+  
+  // 如果没找到局域网地址，再找任何非内部IPv4地址
+  for (const name of Object.keys(interfaces)) {
+    const nets = interfaces[name];
+    if (!nets) continue;
+    
+    for (const net of nets) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  
+  // 最后的回退选项
+  return '127.0.0.1';
+};
 
 // 响应式数据
+const lanAddress = getLANAddress();
+const previewUrl = ref(`http://${lanAddress}:7456`);
 const currentUrl = ref('');
-const inputUrl = ref('');
+const inputUrl = ref(`http://${lanAddress}:7456`);
 const webviewRef = ref<HTMLElement>();
 const loading = ref(false);
 const canGoBack = ref(false);
 const canGoForward = ref(false);
 const hasContent = ref(false);
+// 历史记录管理
+const history = ref<string[]>([]);
+const historyIndex = ref(-1);
 
+// 获取Cocos Creator预览地址
+const getPreviewUrl = async (): Promise<void> => {
+  try {
+    // 使用Cocos Creator的query-preview-url API获取预览地址
+    const url = await Editor.Message.request('preview', 'query-preview-url');
+    
+    if (url) {
+      previewUrl.value = url;
+      inputUrl.value = url;
+      console.log('获取到的预览地址:', url);
+    } else {
+      // 如果API返回空值，使用默认地址
+      const fallbackUrl = `http://${lanAddress}:7456`;
+      previewUrl.value = fallbackUrl;
+      inputUrl.value = fallbackUrl;
+      console.log('API返回空值，使用默认预览地址:', fallbackUrl);
+    }
+    
+  } catch (error) {
+    console.log('获取预览地址失败，使用默认值:', error);
+    const fallbackUrl = `http://${lanAddress}:7456`;
+    previewUrl.value = fallbackUrl;
+    inputUrl.value = fallbackUrl;
+  }
+};
 
+// 组件挂载时获取预览地址并自动加载
+onMounted(async () => {
+  // 等待场景准备好
+  await waitForSceneReady();
+  // 场景准备好后再获取预览地址并加载
+  await getPreviewUrl();
+  // 等待一下确保DOM渲染完成，然后自动加载预览地址
+  setTimeout(() => {
+    loadUrl();
+  }, 100);
+});
+
+// 等待场景准备好
+const waitForSceneReady = async (): Promise<void> => {
+  const maxRetries = 30; // 最多等待30秒
+  const retryInterval = 1000; // 每秒检查一次
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const isReady = await Editor.Message.request('scene', 'query-is-ready');
+      if (isReady) {
+        console.log('场景已准备好，开始加载webview');
+        return;
+      }
+    } catch (error) {
+      console.log('检查场景状态失败:', error);
+    }
+    
+    // 等待一秒后重试
+    await new Promise(resolve => setTimeout(resolve, retryInterval));
+    console.log(`等待场景准备... (${i + 1}/${maxRetries})`);
+  }
+  
+  console.warn('场景长时间未准备好，强制继续加载webview');
+};
 
 // 加载网页
 const loadUrl = () => {
@@ -34,14 +135,33 @@ const loadUrl = () => {
     url = 'https://' + url;
   }
   
+  // 管理历史记录
+  if (currentUrl.value && currentUrl.value !== url) {
+    // 如果当前不在历史记录末尾，清除后面的记录
+    if (historyIndex.value < history.value.length - 1) {
+      history.value = history.value.slice(0, historyIndex.value + 1);
+    }
+    // 添加当前URL到历史记录
+    history.value.push(currentUrl.value);
+    historyIndex.value = history.value.length - 1;
+  } else if (!currentUrl.value) {
+    // 第一次加载，初始化历史记录
+    history.value = [];
+    historyIndex.value = -1;
+  }
+  
   currentUrl.value = url;
   inputUrl.value = url;
   loading.value = true;
   hasContent.value = true;
   
+  // 更新导航按钮状态
+  canGoBack.value = history.value.length > 0;
+  canGoForward.value = false; // 加载新页面后不能前进
+  
   // 更新webview src
   if (webviewRef.value) {
-    (webviewRef.value as any).src = url;
+    (webviewRef.value as HTMLIFrameElement).src = url;
   }
 };
 
@@ -53,40 +173,68 @@ const refresh = () => {
   }
   loading.value = true;
   if (webviewRef.value) {
-    (webviewRef.value as any).reload();
+    // iframe没有reload方法，重新设置src来刷新
+    const iframe = webviewRef.value as HTMLIFrameElement;
+    const currentSrc = iframe.src;
+    iframe.src = '';
+    setTimeout(() => {
+      iframe.src = currentSrc;
+    }, 100);
   }
 };
 
 // 后退
 const goBack = () => {
-  if (webviewRef.value && canGoBack.value) {
-    (webviewRef.value as any).goBack();
+  if (canGoBack.value && historyIndex.value > 0) {
+    historyIndex.value--;
+    const url = history.value[historyIndex.value];
+    currentUrl.value = url;
+    inputUrl.value = url;
+    loading.value = true;
+    
+    // 更新导航按钮状态
+    canGoBack.value = historyIndex.value > 0;
+    canGoForward.value = historyIndex.value < history.value.length - 1;
+    
+    // 更新iframe src
+    if (webviewRef.value) {
+      (webviewRef.value as HTMLIFrameElement).src = url;
+    }
   }
 };
 
 // 前进
 const goForward = () => {
-  if (webviewRef.value && canGoForward.value) {
-    (webviewRef.value as any).goForward();
+  if (canGoForward.value && historyIndex.value < history.value.length - 1) {
+    historyIndex.value++;
+    const url = history.value[historyIndex.value];
+    currentUrl.value = url;
+    inputUrl.value = url;
+    loading.value = true;
+    
+    // 更新导航按钮状态
+    canGoBack.value = historyIndex.value > 0;
+    canGoForward.value = historyIndex.value < history.value.length - 1;
+    
+    // 更新iframe src
+    if (webviewRef.value) {
+      (webviewRef.value as HTMLIFrameElement).src = url;
+    }
   }
 };
 
 // 回到首页
-const goHome = () => {
-  inputUrl.value = 'https://www.google.com';
+const goHome = async () => {
+  // 每次点击主页时重新获取最新的预览地址
+  await getPreviewUrl();
   loadUrl();
 };
 
 // webview事件处理
 const onWebviewLoad = () => {
   loading.value = false;
-  if (webviewRef.value) {
-    const webview = webviewRef.value as any;
-    canGoBack.value = webview.canGoBack();
-    canGoForward.value = webview.canGoForward();
-    currentUrl.value = webview.getURL();
-    inputUrl.value = webview.getURL();
-  }
+  // iframe加载完成后，导航按钮状态已经在loadUrl等函数中更新了
+  // 这里不需要额外的操作，因为iframe没有canGoBack/canGoForward/getURL等方法
 };
 
 const onWebviewLoadStart = () => {
@@ -183,7 +331,7 @@ const handleEnter = () => {
         class="webview"
         @load="onWebviewLoad"
         frameborder="0"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
+        allowfullscreen
       />
     </div>
   </div>
@@ -195,6 +343,9 @@ const handleEnter = () => {
   flex-direction: column;
   height: 100%;
   width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
   background-color: #2b2b2b;
   color: #cccccc;
   overflow: hidden;
@@ -204,7 +355,7 @@ const handleEnter = () => {
 .toolbar {
   display: flex;
   align-items: center;
-  padding: 6px 8px;
+  padding: 6px 0;
   background-color: #3c3c3c;
   border-bottom: 1px solid #525252;
   gap: 8px;
@@ -216,6 +367,7 @@ const handleEnter = () => {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .nav-buttons .el-button {
@@ -241,6 +393,7 @@ const handleEnter = () => {
 .address-bar {
   flex: 1;
   min-width: 200px;
+  margin-right: 8px;
 }
 
 .address-bar :deep(.el-input) {
@@ -293,6 +446,8 @@ const handleEnter = () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  pointer-events: auto;
 }
 
 .empty-state {
@@ -330,6 +485,10 @@ const handleEnter = () => {
   border: none;
   display: block;
   flex: 1;
+  min-height: 0;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .loading-overlay {
@@ -341,11 +500,12 @@ const handleEnter = () => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  z-index: 10;
+  z-index: 100;
   color: #cccccc;
   background-color: rgba(43, 43, 43, 0.8);
   padding: 16px;
   border-radius: 4px;
+  pointer-events: none;
 }
 
 .loading-icon {
@@ -363,7 +523,7 @@ const handleEnter = () => {
 @media (max-width: 600px) {
   .toolbar {
     flex-wrap: wrap;
-    padding: 4px 6px;
+    padding: 4px 0;
   }
   
   .nav-buttons {
@@ -374,6 +534,7 @@ const handleEnter = () => {
     order: 2;
     width: 100%;
     margin-top: 4px;
+    margin-left: 8px;
   }
 }
 
@@ -385,7 +546,7 @@ const handleEnter = () => {
   }
   
   .toolbar {
-    padding: 4px;
+    padding: 4px 0;
     gap: 4px;
   }
 }
